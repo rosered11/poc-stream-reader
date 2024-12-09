@@ -196,15 +196,14 @@ app.MapGet("/compressGzip",  async context =>
         {
             using (var blobStream = await blobClient.OpenReadAsync())
             using (MemoryStream compressedFileStream = new ())
-            using (var gzipStream = new GZipStream(compressedFileStream, CompressionMode.Compress, leaveOpen: true))
+            using (var compressor = new GZipStream(compressedFileStream, CompressionLevel.Optimal, leaveOpen: true))
             {
-                await blobStream.CopyToAsync(gzipStream);
-                compressedFileStream.Flush();
+                await blobStream.CopyToAsync(compressor);
+                await compressor.FlushAsync();
                 compressedFileStream.Seek(0, SeekOrigin.Begin);
-                context.Response.ContentType = "application/gzip";
-                context.Response.Headers.ContentLength = 556000;//compressedFileStream.Length;
+                context.Response.ContentType = "application/octet-stream";
+                context.Response.Headers.ContentLength = compressedFileStream.Length;
                 context.Response.Headers.TryAdd("Content-Disposition", "attachment; filename=\"mytest.xlsx.gz\"");
-                // context.Response.Headers.Remove("Content-Encoding");
                 await compressedFileStream.CopyToAsync(context.Response.Body);
             }
         }
