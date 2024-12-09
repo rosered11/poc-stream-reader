@@ -41,6 +41,7 @@ var summaries = new[]
 };
 
 string blobConnectionString = "";
+bool isClear = true;
 
 app.MapGet("/normal", () =>
     {
@@ -79,7 +80,8 @@ app.MapGet("/normal", () =>
                             }
                             index++;
                             Console.WriteLine();
-                            // tracking.Clear();
+                            if (isClear)
+                                tracking.Clear();
                         }
                     } while (reader.NextResult());
                     Console.WriteLine($"Max records: {index}");
@@ -136,8 +138,7 @@ app.MapGet("/gzip", () =>
             using (var decompres = new GZipStream(blobStream, CompressionMode.Decompress))
             {
                 decompres.CopyTo(memoryStream);
-                memoryStream.Seek(0, SeekOrigin.Begin);
-                // memoryStream.Position = 0;
+                // memoryStream.Seek(0, SeekOrigin.Begin);
                 System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
                 using (var reader = ExcelReaderFactory.CreateReader(memoryStream))
                 {
@@ -164,35 +165,14 @@ app.MapGet("/gzip", () =>
                             }
                             index++;
                             Console.WriteLine();
-                            // tracking.Clear();
+                            if (isClear)
+                                tracking.Clear();
                         }
                     } while (reader.NextResult());
                     Console.WriteLine($"Max records: {index}");
                 }
             }
             #endregion
-            
-            #region ClosedXML is not work for large data
-
-            // using (var blobStream =  blobClient.OpenReadAsync().ConfigureAwait(false).GetAwaiter().GetResult())
-            // using (var workbook = new XLWorkbook(blobStream))
-            // {
-            //     var worksheet = workbook.Worksheets.FirstOrDefault();
-            //     foreach (var row in worksheet.RowsUsed())
-            //     {
-            //         foreach (var col in row.CellsUsed())
-            //         {
-            //             // dataTemp.Add(col.Value.ToString());
-            //             Console.WriteLine($"{col.Value}\t");
-            //         }
-            //             
-            //     }
-            //     Console.WriteLine();
-            // }
-            // Console.WriteLine("End reader");
-
-            #endregion
-            
         }
         var forecast = Enumerable.Range(1, 5).Select(index =>
                 new WeatherForecast
@@ -235,6 +215,13 @@ app.MapGet("/compressGzip",  async context =>
         }
     })
     .WithName("CompressGzip")
+    .WithOpenApi();
+
+app.MapGet("/flushMemory", () =>
+    {
+        GC.Collect();
+    })
+    .WithName("FlushMemory")
     .WithOpenApi();
 
 app.Run();
