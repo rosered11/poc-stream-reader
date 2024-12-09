@@ -223,6 +223,52 @@ app.MapGet("/flushMemory", () =>
     .WithName("FlushMemory")
     .WithOpenApi();
 
+app.MapPost("/upload", async (HttpRequest request, IWebHostEnvironment env) =>
+    {
+        // Check if the request contains a file
+        if (!request.HasFormContentType)
+        {
+            return Results.BadRequest("Invalid form data.");
+        }
+
+        var form = await request.ReadFormAsync();
+        var file = form.Files.FirstOrDefault(x => x.Name == "file");
+
+        if (file == null || file.Length == 0)
+        {
+            return Results.BadRequest("No file uploaded.");
+        }
+
+        // File validation (e.g., size, type)
+        if (file.Length > 10 * 1024 * 1024) // 10 MB size limit
+        {
+            return Results.BadRequest("File size exceeds limit.");
+        }
+
+        var allowedExtensions = new[] { ".xlsx", ".xls", ".csv" };
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+        if (!allowedExtensions.Contains(extension))
+        {
+            return Results.BadRequest("Unsupported file format.");
+        }
+
+        // Save the file to a directory
+        var uploadsPath = Path.Combine(env.WebRootPath ?? env.ContentRootPath, "uploads");
+        Directory.CreateDirectory(uploadsPath);
+
+        var filePath = Path.Combine(uploadsPath, Path.GetRandomFileName() + extension);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        return Results.Ok(new { FilePath = filePath, Message = "File uploaded successfully." });
+    })
+    .WithName("UploadFile")
+    .WithOpenApi();
+
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
