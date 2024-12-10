@@ -223,45 +223,23 @@ app.MapGet("/flushMemory", () =>
     .WithName("FlushMemory")
     .WithOpenApi();
 
-app.MapPost("/upload", async (HttpRequest request, IWebHostEnvironment env) =>
+app.MapPost("/upload/directory/{directory}/fileName/{fileName}", async (string directory, string fileName,HttpRequest request, IWebHostEnvironment env) =>
     {
-        // Check if the request contains a file
-        if (!request.HasFormContentType)
+        // Check if the request stream of file
+        if (request.ContentType is null || !request.ContentType.StartsWith("application/octet-stream"))
         {
-            return Results.BadRequest("Invalid form data.");
-        }
-
-        var form = await request.ReadFormAsync();
-        var file = form.Files.FirstOrDefault(x => x.Name == "file");
-
-        if (file == null || file.Length == 0)
-        {
-            return Results.BadRequest("No file uploaded.");
-        }
-
-        // File validation (e.g., size, type)
-        if (file.Length > 10 * 1024 * 1024) // 10 MB size limit
-        {
-            return Results.BadRequest("File size exceeds limit.");
-        }
-
-        var allowedExtensions = new[] { ".xlsx", ".xls", ".csv" };
-        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-
-        if (!allowedExtensions.Contains(extension))
-        {
-            return Results.BadRequest("Unsupported file format.");
+            return Results.BadRequest("Invalid content type. Expected: application/octet-stream");
         }
 
         // Save the file to a directory
-        var uploadsPath = Path.Combine(env.WebRootPath ?? env.ContentRootPath, "uploads");
+        var uploadsPath = Path.Combine(env.WebRootPath ?? env.ContentRootPath, directory);
         Directory.CreateDirectory(uploadsPath);
 
-        var filePath = Path.Combine(uploadsPath, Path.GetRandomFileName() + extension);
+        var filePath = Path.Combine(uploadsPath, fileName);
 
         using (var stream = new FileStream(filePath, FileMode.Create))
         {
-            await file.CopyToAsync(stream);
+            await request.Body.CopyToAsync(stream);
         }
 
         return Results.Ok(new { FilePath = filePath, Message = "File uploaded successfully." });

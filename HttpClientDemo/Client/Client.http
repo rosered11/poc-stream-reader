@@ -1,0 +1,6 @@
+@Client_HostAddress = http://localhost:5003
+
+POST {{Client_HostAddress}}/upload/
+Accept: application/json
+
+###

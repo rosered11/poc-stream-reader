@@ -1,5 +1,5 @@
-*/.idea
-*/bin
-*/obj
-*.user
-*.DS_Store
+**/*.idea
+**/*bin
+**/*obj
+**/*.user
+**/*.DS_Store
