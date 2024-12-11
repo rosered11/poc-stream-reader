@@ -306,6 +306,29 @@ app.MapPost("/uploadStream/directory/{directory}/fileName/{fileName}", async (st
     .WithName("UploadFile")
     .WithOpenApi();
 
+app.MapGet("/download/directory/{directory}/fileName/{fileName}", async (string directory, string fileName, HttpContext context) =>
+    {
+        BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
+        BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient(directory);
+        BlobClient blobClient = containerClient.GetBlobClient(fileName);
+        if (blobClient.Exists())
+        {
+            using (var blobStream = await blobClient.OpenReadAsync())
+            {
+                
+                // await compressor.FlushAsync();
+                // compressedFileStream.Seek(0, SeekOrigin.Begin);
+                context.Response.ContentType = "application/octet-stream";
+                context.Response.Headers.ContentLength = blobStream.Length;
+                context.Response.Headers.TryAdd("Content-Disposition", $"attachment; filename=\"{fileName}\"");
+                await blobStream.CopyToAsync(context.Response.Body);
+            }
+        }
+        return Results.NotFound(new { Message = "File not found." });
+    })
+    .WithName("Download")
+    .WithOpenApi();
+
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
