@@ -127,62 +127,6 @@ app.MapGet("/normal", () =>
     .WithName("GetWeatherForecast")
     .WithOpenApi();
 
-app.MapGet("/normalClosedXMLCSV", async () =>
-    {
-        BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
-        BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient("awb");
-        BlobClient blobClient = containerClient.GetBlobClient("test.csv.gz");
-        List<string> dataTemp = new();
-        if (blobClient.Exists())
-        {
-            #region ClosedXML is not work for large data
-
-            ProcessManagement processManagement = new();
-            await processManagement.ProcessExcel(blobClient);
-
-            #endregion
-        }
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("NormalClosedXMLCSV")
-    .WithOpenApi();
-
-app.MapGet("/normalClosedXMLExcel", async () =>
-    {
-        BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
-        BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient("awb");
-        BlobClient blobClient = containerClient.GetBlobClient("test.xlsx.gz");
-        List<string> dataTemp = new();
-        if (blobClient.Exists())
-        {
-            #region ClosedXML is not work for large data
-
-            ProcessManagement processManagement = new();
-            await processManagement.ProcessExcel(blobClient);
-
-            #endregion
-        }
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("NormalClosedXMLExcel")
-    .WithOpenApi();
-
 app.MapGet("/gzip", () =>
     {
         BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
@@ -246,6 +190,94 @@ app.MapGet("/gzip", () =>
     .WithName("Gzip")
     .WithOpenApi();
 
+#region Test Read data between Csv and Excel
+
+app.MapGet("/normalClosedXMLCSV", async () =>
+    {
+        BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
+        BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient("awb");
+        BlobClient blobClient = containerClient.GetBlobClient("test.csv.gz");
+        List<string> dataTemp = new();
+        if (blobClient.Exists())
+        {
+            #region ClosedXML is not work for large data
+
+            ProcessManagement processManagement = new();
+            await processManagement.ProcessCsv(blobClient);
+
+            #endregion
+        }
+        var forecast = Enumerable.Range(1, 5).Select(index =>
+                new WeatherForecast
+                (
+                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+                    Random.Shared.Next(-20, 55),
+                    summaries[Random.Shared.Next(summaries.Length)]
+                ))
+            .ToArray();
+        return forecast;
+    })
+    .WithName("NormalClosedXMLCSV")
+    .WithOpenApi();
+
+app.MapGet("/normalClosedXMLExcel", async () =>
+    {
+        BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
+        BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient("awb");
+        BlobClient blobClient = containerClient.GetBlobClient("test.xlsx.gz");
+        List<string> dataTemp = new();
+        if (blobClient.Exists())
+        {
+            #region ClosedXML is not work for large data
+
+            ProcessManagement processManagement = new();
+            await processManagement.ProcessExcel(blobClient);
+
+            #endregion
+        }
+        var forecast = Enumerable.Range(1, 5).Select(index =>
+                new WeatherForecast
+                (
+                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+                    Random.Shared.Next(-20, 55),
+                    summaries[Random.Shared.Next(summaries.Length)]
+                ))
+            .ToArray();
+        return forecast;
+    })
+    .WithName("NormalClosedXMLExcel")
+    .WithOpenApi();
+
+    app.MapGet("/normalClosedXMLExcelStream", async () =>
+    {
+        BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
+        BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient("awb");
+        BlobClient blobClient = containerClient.GetBlobClient("test.xlsx.gz");
+        List<string> dataTemp = new();
+        if (blobClient.Exists())
+        {
+            #region ClosedXML is not work for large data
+
+            ProcessManagement processManagement = new();
+            await processManagement.ProcessExcelStream(blobClient);
+
+            #endregion
+        }
+        var forecast = Enumerable.Range(1, 5).Select(index =>
+                new WeatherForecast
+                (
+                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+                    Random.Shared.Next(-20, 55),
+                    summaries[Random.Shared.Next(summaries.Length)]
+                ))
+            .ToArray();
+        return forecast;
+    })
+    .WithName("NormalClosedXMLExcelStream")
+    .WithOpenApi();
+
+#endregion
+
 app.MapGet("/compressGzip",  async context =>
     {
         BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
@@ -281,6 +313,8 @@ app.MapGet("/flushMemory", () =>
     })
     .WithName("FlushMemory")
     .WithOpenApi();
+
+#region Upload and Download from blob storage
 
 app.MapPost("/uploadStream/directory/{directory}/fileName/{fileName}", async (string directory, string fileName,HttpRequest request, IWebHostEnvironment env) =>
     {
@@ -329,6 +363,8 @@ app.MapGet("/download/directory/{directory}/fileName/{fileName}", async (string 
     .WithName("Download")
     .WithOpenApi();
 
+#endregion
+
 app.Run();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
@@ -349,9 +385,11 @@ record ProcessManagement()
             using (StreamReader streamReader = new(memoryStream, Encoding.UTF8))
             using (var csv = new CsvReader(streamReader, CultureInfo.InvariantCulture))
             {
+                List<dynamic> batchRecords = new();
                 var records = csv.GetRecords<dynamic>();
                 foreach (var record in records)
                 {
+                    batchRecords.Add(record);
                     var recordDict = (IDictionary<string, object>)record;
                     foreach (var property in recordDict)
                         Console.Write($"{property.Value}\t");
@@ -371,15 +409,48 @@ record ProcessManagement()
             decompres.CopyTo(memoryStream);
             using (var workbook = new XLWorkbook(memoryStream))
             {
+                List<IXLRow> batchRows = new();
                 var worksheet = workbook.Worksheets.FirstOrDefault();
                 foreach (var row in worksheet.RowsUsed())
                 {
+                    batchRows.Add(row);
                     foreach (var col in row.CellsUsed())
                     {
                         Console.Write($"{col.Value}\t");
                     }
                     Console.WriteLine();       
                 }
+            }
+        }
+        Console.WriteLine("End reader");
+    }
+    public async Task ProcessExcelStream(BlobClient blobClient)
+    {
+        using (var blobStream = await blobClient.OpenReadAsync())
+        using (MemoryStream memoryStream = new MemoryStream())
+        using (var decompres = new GZipStream(blobStream, CompressionMode.Decompress))
+        {
+            decompres.CopyTo(memoryStream);
+            System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            using (var reader = ExcelReaderFactory.CreateReader(memoryStream))
+            {
+                int index = 0;
+                List<IExcelDataReader> batchRows = new();
+                do
+                {
+                    Console.WriteLine($"WorkSheet: {reader.Name}");
+                    while (reader.Read())
+                    {
+                        batchRows.Add(reader);
+                        for (int col = 0; col < reader.FieldCount; col++)
+                        {
+                            Console.Write($"{reader.GetValue(col)}\t");
+                        }
+                        index++;
+                        Console.WriteLine();
+                    }
+                } while (reader.NextResult());
+                Console.WriteLine($"Max records: {index}");
             }
         }
         Console.WriteLine("End reader");
