@@ -1,7 +1,10 @@
+using System.Globalization;
 using System.IO.Compression;
+using System.Text;
 using Azure;
 using Azure.Storage.Blobs;
 using ClosedXML.Excel;
+using CsvHelper;
 using ExcelDataReader;
 using Microsoft.AspNetCore.ResponseCompression;
 
@@ -124,6 +127,62 @@ app.MapGet("/normal", () =>
     .WithName("GetWeatherForecast")
     .WithOpenApi();
 
+app.MapGet("/normalClosedXMLCSV", async () =>
+    {
+        BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
+        BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient("awb");
+        BlobClient blobClient = containerClient.GetBlobClient("test.csv.gz");
+        List<string> dataTemp = new();
+        if (blobClient.Exists())
+        {
+            #region ClosedXML is not work for large data
+
+            ProcessManagement processManagement = new();
+            await processManagement.ProcessExcel(blobClient);
+
+            #endregion
+        }
+        var forecast = Enumerable.Range(1, 5).Select(index =>
+                new WeatherForecast
+                (
+                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+                    Random.Shared.Next(-20, 55),
+                    summaries[Random.Shared.Next(summaries.Length)]
+                ))
+            .ToArray();
+        return forecast;
+    })
+    .WithName("NormalClosedXMLCSV")
+    .WithOpenApi();
+
+app.MapGet("/normalClosedXMLExcel", async () =>
+    {
+        BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
+        BlobContainerClient containerClient = blobServiceClient.GetBlobContainerClient("awb");
+        BlobClient blobClient = containerClient.GetBlobClient("test.xlsx.gz");
+        List<string> dataTemp = new();
+        if (blobClient.Exists())
+        {
+            #region ClosedXML is not work for large data
+
+            ProcessManagement processManagement = new();
+            await processManagement.ProcessExcel(blobClient);
+
+            #endregion
+        }
+        var forecast = Enumerable.Range(1, 5).Select(index =>
+                new WeatherForecast
+                (
+                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+                    Random.Shared.Next(-20, 55),
+                    summaries[Random.Shared.Next(summaries.Length)]
+                ))
+            .ToArray();
+        return forecast;
+    })
+    .WithName("NormalClosedXMLExcel")
+    .WithOpenApi();
+
 app.MapGet("/gzip", () =>
     {
         BlobServiceClient blobServiceClient = new BlobServiceClient(blobConnectionString);
@@ -223,7 +282,7 @@ app.MapGet("/flushMemory", () =>
     .WithName("FlushMemory")
     .WithOpenApi();
 
-app.MapPost("/upload/directory/{directory}/fileName/{fileName}", async (string directory, string fileName,HttpRequest request, IWebHostEnvironment env) =>
+app.MapPost("/uploadStream/directory/{directory}/fileName/{fileName}", async (string directory, string fileName,HttpRequest request, IWebHostEnvironment env) =>
     {
         // Check if the request stream of file
         if (request.ContentType is null || !request.ContentType.StartsWith("application/octet-stream"))
@@ -252,4 +311,54 @@ app.Run();
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}
+
+record ProcessManagement()
+{
+    public async Task ProcessCsv(BlobClient blobClient)
+    {
+        using (var blobStream = await blobClient.OpenReadAsync())
+        using (MemoryStream memoryStream = new ())
+        using (var decompres = new GZipStream(blobStream, CompressionMode.Decompress))
+        {
+            decompres.CopyTo(memoryStream);
+            memoryStream.Seek(0, SeekOrigin.Begin);
+            using (StreamReader streamReader = new(memoryStream, Encoding.UTF8))
+            using (var csv = new CsvReader(streamReader, CultureInfo.InvariantCulture))
+            {
+                var records = csv.GetRecords<dynamic>();
+                foreach (var record in records)
+                {
+                    var recordDict = (IDictionary<string, object>)record;
+                    foreach (var property in recordDict)
+                        Console.Write($"{property.Value}\t");
+                    Console.WriteLine();
+                }
+            }
+        }
+        Console.WriteLine("End reader");
+    }
+
+    public async Task ProcessExcel(BlobClient blobClient)
+    {
+        using (var blobStream = await blobClient.OpenReadAsync())
+        using (MemoryStream memoryStream = new MemoryStream())
+        using (var decompres = new GZipStream(blobStream, CompressionMode.Decompress))
+        {
+            decompres.CopyTo(memoryStream);
+            using (var workbook = new XLWorkbook(memoryStream))
+            {
+                var worksheet = workbook.Worksheets.FirstOrDefault();
+                foreach (var row in worksheet.RowsUsed())
+                {
+                    foreach (var col in row.CellsUsed())
+                    {
+                        Console.Write($"{col.Value}\t");
+                    }
+                    Console.WriteLine();       
+                }
+            }
+        }
+        Console.WriteLine("End reader");
+    }
 }
